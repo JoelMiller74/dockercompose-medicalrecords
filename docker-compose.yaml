@@ -1,0 +1,49 @@
+services:
+  db:
+    image: postgres:17
+    container_name: Medical-Records-DB
+    hostname: medical-db
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "pg_isready", "-q", "-d", "medical", "-U", "medicaluser"]
+      timeout: 45s
+      interval: 10s
+      retries: 10
+    volumes:
+      - /volume1/docker/medicalrecords/db:/var/lib/postgresql/data:rw
+    environment:
+      POSTGRES_DB: medical
+      POSTGRES_USER: medicaluser
+      POSTGRES_PASSWORD: ${MEDICAL_RECORDS_DB_PASSWORD}
+    restart: on-failure:5
+
+  medical-records-app:
+    image: ghcr.io/afairgiant/personal-medical-records-keeper/medical-records:latest
+    container_name: Medical-Records
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    ports:
+       - 8005:8000
+    environment:
+      DB_HOST: medical-db
+      DB_PORT: 5432
+      DB_NAME: medical
+      DB_USER: medicaluser
+      DB_PASSWORD: ${MEDICAL_RECORDS_DB_PASSWORD}
+      SECRET_KEY: ${MEDICAL_RECORDS_SECRET_KEY}
+      TZ: America/Chicago
+      LOG_LEVEL: info
+      # SSL Configuration - Remove the # in front of ENABLE_SSL to use your synology.me DDNS
+      #ENABLE_SSL: true
+    volumes:
+      - /volume1/docker/medicalrecords/uploads:/app/uploads:rw
+      - /volume1/docker/medicalrecords/logs:/app/logs:rw
+      - /volume1/docker/medicalrecords/backups:/app/backups:rw
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: on-failure:5
